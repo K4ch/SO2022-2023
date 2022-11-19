@@ -23,9 +23,13 @@ void main(int argc, char ** argv){
 	int initSize = strlen(input);
 	char delim[] = " ";
 	while(!end){
+		printf("Antes fgets\n");
 		fgets(input, 100, stdin);
+		printf("Depois fgets\n");
 		char *ptr = strtok(input, delim);
-		if(strcpy(ptr, "sell"){
+		printf("%s\n", ptr);
+		if(strcmp(ptr, "sell")==0){
+			printf("Depois compare a sell\n");
 			ptr = strtok(NULL, delim);
 			char nomeI[20];
 			strcpy(nomeI, ptr);
@@ -36,7 +40,7 @@ void main(int argc, char ** argv){
 
 			ptr = strtok(NULL, delim);
 			int precoB;
-			if(atoi(ptr) == 0){
+			if(atoi(ptr) == 0 && strcmp(ptr, NULL) == 0){
 				printf("Preço base introduzido inválido, por favor introduza um número\n");
 				continue;
 			}
@@ -60,15 +64,15 @@ void main(int argc, char ** argv){
 				printf("Argumentos a mais para o comando \"sell\"\n");
 				continue;
 			}
-			printf("Comando \"sell %s %s %d %d %d\"\n", &nomeI, %nomeCat, precoB, precoC, duracao);
-		}else if(strcpy(ptr, "list"){
+			printf("Comando \"sell %s %s %d %d %d\"\n", &nomeI, &nomeCat, precoB, precoC, duracao);
+		}else if(strcmp(ptr, "list")==0){
 			ptr = strtok(NULL, delim);
 			if(ptr != NULL){
 				printf("Argumentos a mais para o comando \"list\"\n");
 				continue;
 			}
 			printf("Comando \"list\" recebido\n");
-		}else if(strcpy(ptr, "licat"){
+		}else if(strcmp(ptr, "licat")==0){
 			ptr = strtok(NULL, delim);
 			char nomeCat[20];
 			strcpy(nomeCat, ptr);
@@ -78,21 +82,21 @@ void main(int argc, char ** argv){
 				continue;
 			}
 			printf("Comando \"licat\" recebido\n");
-		}else if(strcpy(ptr, "lisel"){
+		}else if(strcmp(ptr, "lisel")==0){
 
-		}else if(strcpy(ptr, "lival"){
+		}else if(strcmp(ptr, "lival")==0){
 
-		}else if(strcpy(ptr, "litime"){
+		}else if(strcmp(ptr, "litime")==0){
 
-		}else if(strcpy(ptr, "time"){
+		}else if(strcmp(ptr, "time")==0){
 
-		}else if(strcpy(ptr, "buy"){
+		}else if(strcmp(ptr, "buy")==0){
 
-		}else if(strcpy(ptr, "cash"){
+		}else if(strcmp(ptr, "cash")==0){
 
-		}else if(strcpy(ptr, "add"){
+		}else if(strcmp(ptr, "add")==0){
 
-		}else if(strcpy(ptr, "exit"){
+		}else if(strcmp(ptr, "exit")==0){
 
 		}
 	}
