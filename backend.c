@@ -1,10 +1,30 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-#include <unistd.h>
-#include "utils.h"
-#include "users_lib.h"
+#include "libs.h"
+
+int serv_fd, cli_to_serv_fd, serv_to_cli_fd;
+char *fUsers, *fPromoters, *fItems;
+int Pid;
+
+Item *listaItems;
+size_t listaItems_size = 0;
+size_t listaUsers_size = 0;
+
+const int MAXUSERS = 20, MAXPROMOTERS = 10, MAXITEMS = 30;
+
+void shutdown(){
+    fprintf(stderr, "\nA desligar...\n");
+    close(serv_fd);
+    close(serv_to_cli_fd);
+    close(cli_to_serv_fd);
+    unlink(SERVER_FIFO);
+    unlink(CLIENT_TO_SERVER);
+    exit(EXIT_FAILURE);
+}
+
+void sighand(int s){
+    if(s == SIGINT){
+        shutdown();
+    }
+}
 
 bool checkPointerNull(char *ptr){
         if(ptr == NULL){
@@ -94,39 +114,120 @@ void printUserSaldo(Utilizador a){
 
 void main(int argc, char ** argv){
 
-	int nUsers;
-	int option;
-	bool endMenu = false;
-	char* fUsers = getenv("USERS_FILE");
-	char* fPromos = getenv("PROMOS_FILE");
-	char* fItems = getenv("ITEMS_FILE");
+    //VERIFICAR SE ALGUM BACKEND ESTÁ A CORRER
+    if(access(SERVER_FIFO, F_OK) == 0){
+        fprintf(stderr, "\nJá se encontra um backend a correr!\nA desligar...\n");
+        exit(EXIT_FAILURE);
+    }
 
-	nUsers = loadUsersFile("/home/fabio/SOBay/FUSERS.txt");
-	if(nUsers == -1){
-		printf("Erro a carregar os utilizadores\n");
-	}
+    //FICHEIRO DE USERS
+    fUsers = getenv("FUSERS");
+    if(fUsers == NULL){
+        fprintf(stderr, "\nNão existe variável de ambiente com o path para o ficheiro de utilizadores\nA desligar...\n");
+        exit(EXIT_FAILURE);
+    }else{
+        listaUsers_size = sizeof(Utilizador) * loadUsersFile(fUsers);
+    }
 
-	Utilizador dummy1;
-	strcpy(dummy1.nome, "Dummy1");
-	strcpy(dummy1.pwd, "1234");
-	dummy1.saldo = 100;
+    //FICHEIRO DE PROMOTORES
+    fPromoters = getenv("FPROMOTERS");
+    if(fPromoters == NULL){
+        fprintf(stderr, "\nNão existe variável de ambiente com o path para o ficheiro de promotores\nA desligar...\n");
+        exit(EXIT_FAILURE);
+    }else{
+        //TODO: Ler o ficheiro de promotores
+    }
 
-	Utilizador dummy2;
-	strcpy(dummy2.nome, "Dummy2");
-	strcpy(dummy2.pwd, "4321");
-	dummy2.saldo = 200;
+    //FICHEIRO DE ITEMS
+    fItems = getenv("FITEMS");
+    if(fItems == NULL){
+        fprintf(stderr, "\nNão existe variável de ambiente com o path para o ficheiro de items\nNão vai ser carregado nenhum item\n");
+    }else{
+        fprintf(stderr, "\nFoi encontrado um ficheiro, procedendo á sua leitura...\n");
+        FILE *file = fopen(fItems, "r");
+        char* fullItem = NULL;
+        size_t len = 0;
+        char delim[] = " ";
+        int counter = 0;
 
-	Utilizador users[2];
-	users[0] = dummy1;
-	users[1] = dummy2;
+        if(file == NULL){
+            printf("Erro a abrir ficheiro\n");
+        }
 
-	Item items[3];
-	Item item1, item2, item3;
-	items[0] = item1;
-	items[1] = item2;
-	items[2] = item3;
+        while(getline(&fullItem, &len, file) != -1){
+            if(listaItems == NULL){
+                printf("\nLista Items é null, a criar espaço para o primeiro membro\n");
+                listaItems = (Item*) malloc(sizeof(Item));
+                listaItems_size += sizeof(Item);
+            }else{
+                printf("\nLista Items não é null, a criar espaço para o próximo membro\n");
+                listaItems = (Item*) realloc(listaItems, listaItems_size * sizeof(Item));
+                listaItems_size += sizeof(Item);
+            }
 
-	while(!endMenu){
+            Item tmp;
+            char* ptr = strtok(fullItem, delim);
+            tmp.id = atoi(ptr);
+            ptr = strtok(NULL, delim);
+            strcpy(tmp.nome, ptr);
+            ptr = strtok(NULL, delim);
+            strcpy(tmp.cat, ptr);
+            ptr = strtok(NULL, delim);
+            tmp.valorA = atoi(ptr);
+            ptr = strtok(NULL, delim);
+            tmp.valorC = atoi(ptr);
+            ptr = strtok(NULL, delim);
+            tmp.duracao = atoi(ptr);
+            ptr = strtok(NULL, delim);
+            strcpy(tmp.nomeV, ptr);
+            ptr = strtok(NULL, delim);
+            strcpy(tmp.nomeL, ptr);
+
+            *(listaItems + counter) = tmp;
+
+            printItem(*(listaItems+counter));
+            counter++;
+        }
+        fclose(file);
+    }
+
+    Pid = getpid();
+
+    system("clear");
+    printf("\n******************************\n");
+    printf("*****Bem-vindo ao Backend*****\n");
+    printf("******************************\n");
+
+
+    //CRIA FIFO DE SERVIDOR
+    if(mkfifo(SERVER_FIFO, 0777) == -1){
+        fprintf(stderr, "\nErro ao criar o FIFO do servidor\n");
+        shutdown();
+    }
+
+    //ABRE FIFO DE SERVIDOR
+    serv_fd = open(SERVER_FIFO, O_RDWR);
+    if(serv_fd == -1){
+        fprintf(stderr, "\nErro ao abrir FIFO do servidor\n");
+        shutdown();
+    }
+
+    //CRIA FIFO DE CLIENTE PARA SERVIDOR
+    if(mkfifo(CLIENT_TO_SERVER, 0777) == -1){
+        fprintf(stderr, "\nErro ao criar o FIFO do cliente para o servidor\n");
+        shutdown();
+    }
+
+    //ABRE FIFO DE CLIENTE PARA SERVIDOR
+    cli_to_serv_fd = open(CLIENT_TO_SERVER, O_RDWR);
+    if(cli_to_serv_fd == -1){
+        fprintf(stderr, "\nErro ao abrir o FIFO do cliente para o servidor\n");
+        shutdown();
+    }
+
+    executaComandos();
+
+	/*while(!endMenu){
         	printf("\nEscolha a próxima operação:\n1- Comandos\n2- Promotor\n3- Users\n4- Itens\n5- Terminar\n\n");
         	scanf("%d", &option);
         	switch(option){
@@ -135,17 +236,12 @@ void main(int argc, char ** argv){
             		case 2: executaPromotor();break;
 
             		case 3: {
-					if(saveUsersFile("FUSERS.txt")==-1){
-						printf("Erro a guardar users\n");
-					}
-					for(int i = 0; i < 2; i++){
-						users[i].saldo -= 1;
-						printUserSaldo(users[i]);
+					TOD
 					}
 				}break;
 
             		case 4: {
-					FILE *file = fopen("FITEMS.txt", "r");
+					FILE *file = fopen("items.txt", "r");
 					char* fullItem = NULL;
 					size_t len = 0;
 					char delim[] = " ";
@@ -179,5 +275,5 @@ void main(int argc, char ** argv){
 
             		case 5: endMenu = true;break;
         }
-    }
+    }*/
 }
