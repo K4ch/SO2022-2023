@@ -4,8 +4,10 @@ int serv_fd, cli_to_serv_fd, serv_to_cli_fd;
 char *fUsers, *fPromoters, *fItems;
 int Pid;
 
+int highestItemId = 1;
 Item *listaItems;
 size_t listaItems_size = 0;
+int listaItems_length = 0;
 size_t listaUsers_size = 0;
 
 const int MAXUSERS = 20, MAXPROMOTERS = 10, MAXITEMS = 30;
@@ -112,6 +114,109 @@ void printUserSaldo(Utilizador a){
 	return;
 }
 
+void *ClientHandlerThread(void *arg){
+    Mensagem msg = *(Mensagem *) arg;
+
+    int pidCliente = msg.pid;
+    char nameClientFifo[50];
+    strcpy(nameClientFifo, msg.fifoName);
+
+    int valid = isUserValid(msg.user.nome, msg.user.pwd);
+    if(valid == -1){
+        fprintf(stderr, "Erro a verificiar a validade do utilizador, a fechar thread de utilizador pid: %d, nome do fifo: %s, nome do user %s\n", pidCliente, nameClientFifo, msg.user.nome);
+        //TODO: Matar cliente com sinal
+        return NULL;
+    }else if(valid == 0){
+        fprintf(stderr, "O utilizador pid: %d, nome do fifo: %s, nome do user %s, não possui credenciais válidas, a fechar thread e utilizador\n", pidCliente, nameClientFifo, msg.user.nome);
+        //TODO: Matar cliente com sinal
+        return NULL;
+    }
+
+    char delim[] = " ";
+    while(1){
+        //TODO: ficar á espera de mensagens do utilizador e corresponder com a informação necessária
+        if(read(cli_to_serv_fd, &msg, sizeof(msg)) == -1){
+            fprintf(stderr, "Erro a ler mensagem do cliente\nA delisgar...\n");
+            shutdown();
+        }
+
+        char *ptr = strtok(msg.cmd, delim);
+        if(strcpy(ptr, "sell") == 0){
+            Resposta rsp;
+            Item tmp;
+            tmp.id = ++highestItemId;
+            ptr = strtok(NULL, delim);
+            strcpy(tmp.nome, ptr);
+            ptr = strtok(NULL, delim);
+            strcpy(tmp.cat, ptr);
+            ptr = strtok(NULL, delim);
+            tmp.valorA  = atoi(ptr);
+            ptr = strtok(NULL, delim);
+            tmp.valorC  = atoi(ptr);
+            ptr = strtok(NULL, delim);
+            tmp.duracao = atoi(ptr);
+            strcpy(tmp.nomeV, msg.user.nome);
+            strcpy(tmp.nomeL, "-");
+            listaItems = (Item*) realloc(listaItems, listaItems_size * sizeof(Item));
+            listaItems_size += sizeof(Item);
+            listaItems_length++;
+            *(listaItems + listaItems_length-1) = tmp;
+
+            rsp.wasExecuted = true;
+            sprintf(rsp.resp, "%d", tmp.id);
+            if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+                fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+                shutdown();
+            }
+        }else if(strcpy(ptr, "list\n") == 0){
+            Resposta rsp;
+            rsp.wasExecuted = true;
+            rsp.listaItems = (Item*) malloc(listaItems_size);
+            *rsp.listaItems = *listaItems;
+            if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+                fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+                shutdown();
+            }
+        }else if(strcpy(ptr, "licat") == 0){
+            Resposta rsp;
+            char categoria[20];
+            ptr = strtok(NULL, delim);
+            strcpy(categoria, ptr);
+            for(int i = 0; i < listaItems_length; i++){
+                if(strcmp(categoria, (listaItems+i)->cat)==0){
+                    if(rsp.listaItems == NULL){
+                        rsp.listaItems = (Item*) malloc(sizeof(Item));
+                        *(rsp.listaItems + rsp.listaItems_length) = *(listaItems+i);
+                        rsp.listaItems_length++;
+                    }else{
+                        rsp.listaItems = (Item*) realloc(rsp.listaItems, rsp.listaItems_length * sizeof(Item));
+                        *(rsp.listaItems + rsp.listaItems_length) = *(listaItems+i);
+                        rsp.listaItems_length++;
+                    }
+                }
+            }
+            if(rsp.listaItems == NULL){
+                rsp.wasExecuted = false;
+            }else{
+                rsp.wasExecuted = true;
+            }
+            if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+                fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+                shutdown();
+            }
+        }else if(strcpy(ptr, "lisel")){
+            Resposta rsp;
+            //TODO:procurar pelo vendedor, adicionar á rsp e mandar
+        }else if(strcpy(ptr, "lival")){
+            Resposta rsp;
+            //TODO:procurar pelo preco, adicionar á rsp e mandar
+        }else if(strcpy(ptr, "litime")){
+            Resposta rsp;
+            //TODO:procurar pelo tempo, adicionar á rsp e mandar
+        }
+    }
+}
+
 void main(int argc, char ** argv){
 
     //VERIFICAR SE ALGUM BACKEND ESTÁ A CORRER
@@ -159,10 +264,12 @@ void main(int argc, char ** argv){
                 printf("\nLista Items é null, a criar espaço para o primeiro membro\n");
                 listaItems = (Item*) malloc(sizeof(Item));
                 listaItems_size += sizeof(Item);
+                listaItems_length++;
             }else{
                 printf("\nLista Items não é null, a criar espaço para o próximo membro\n");
-                listaItems = (Item*) realloc(listaItems, listaItems_size * sizeof(Item));
+                listaItems = (Item*) realloc(listaItems, (listaItems_length)+1 * sizeof(Item));
                 listaItems_size += sizeof(Item);
+                listaItems_length++;
             }
 
             Item tmp;
@@ -189,6 +296,14 @@ void main(int argc, char ** argv){
             counter++;
         }
         fclose(file);
+        for(int i = 0; i < listaItems_length; i++){
+            if(i == 0){
+                highestItemId = (listaItems + i)->id;
+            }
+            if(highestItemId < (listaItems + i)->id){
+                highestItemId = (listaItems + i)->id;
+            }
+        }
     }
 
     Pid = getpid();
@@ -224,6 +339,19 @@ void main(int argc, char ** argv){
         fprintf(stderr, "\nErro ao abrir o FIFO do cliente para o servidor\n");
         shutdown();
     }
+
+    pthread_t ClientHandler;
+    Mensagem msg;
+
+    while(1){
+        if(read(cli_to_serv_fd, &msg, sizeof(msg)) == -1){
+            fprintf(stderr, "Erro a ler mensagem do utilizador\nA desligar...\n");
+            shutdown();
+        }else{
+            pthread_create( &ClientHandler, NULL, ClientHandlerThread, &msg);
+        }
+    }
+
 
     executaComandos();
 

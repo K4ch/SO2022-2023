@@ -23,13 +23,14 @@ typedef struct mensagemToServ{
     Utilizador user;
     int pid;
     char fifoName[50];
-    char cmd[20];
+    char cmd[100];
 } Mensagem;
 
 typedef struct respostaFromServ{
     bool wasExecuted;
     char resp[50];
     Item *listaItems;
-} Reposta;
+    int listaItems_length;
+} Resposta;
 
 
