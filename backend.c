@@ -168,7 +168,7 @@ void *ClientHandlerThread(void *arg){
                 fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
                 shutdown();
             }
-        }else if(strcpy(ptr, "list\n") == 0){
+        }else if(strcpy(ptr, "list") == 0){
             Resposta rsp;
             rsp.wasExecuted = true;
             rsp.listaItems = (Item*) malloc(listaItems_size);
@@ -204,15 +204,62 @@ void *ClientHandlerThread(void *arg){
                 fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
                 shutdown();
             }
-        }else if(strcpy(ptr, "lisel")){
+        }else if(strcpy(ptr, "lisel") == 0){
             Resposta rsp;
+            Item *tmp;
+            int counter = 0;
+            ptr = strtok(NULL, delim);
+            char nomeV[20];
+            strcpy(nomeV, ptr);
             //TODO:procurar pelo vendedor, adicionar á rsp e mandar
-        }else if(strcpy(ptr, "lival")){
+            for(int i = 0; i < listaItems_length; i++){
+                if(strcmp((listaItems + i)->nomeV, nomeV) == 0){
+                    if(tmp == NULL){
+                        tmp = (Item*) malloc(sizeof(Item));
+                    }else{
+                        tmp = (Item*) realloc(tmp, counter * sizeof(Item));
+                    }
+
+                }
+            }
+
+        }else if(strcpy(ptr, "lival") == 0){
             Resposta rsp;
             //TODO:procurar pelo preco, adicionar á rsp e mandar
-        }else if(strcpy(ptr, "litime")){
+
+
+        }else if(strcpy(ptr, "litime") == 0){
             Resposta rsp;
             //TODO:procurar pelo tempo, adicionar á rsp e mandar
+
+
+        }else if(strcpy(ptr, "cash") == 0){
+            Resposta rsp;
+            int saldo = getUserBalance(msg.user.nome);
+            if(saldo == -1){
+                rsp.wasExecuted = false;
+            }else{
+                rsp.wasExecuted = true;
+                sprintf(rsp.resp, "%d", saldo);
+            }
+            if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+                fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+                shutdown();
+            }
+        }else if(strcpy(ptr, "add") == 0){
+            Resposta rsp;
+            ptr = strtok(NULL, delim);
+            int qnt = atoi(ptr);
+            int res = updateUserBalance(msg.user.nome, qnt);
+            if(res == -1){
+                rsp.wasExecuted = false;
+            }else{
+                rsp.wasExecuted = true;
+            }
+            if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+                fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+                shutdown();
+            }
         }
     }
 }
