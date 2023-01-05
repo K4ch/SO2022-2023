@@ -33,4 +33,6 @@ typedef struct respostaFromServ{
     int listaItems_length;
 } Resposta;
 
+void printItem(Item a);
+
 

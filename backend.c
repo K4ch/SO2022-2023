@@ -9,11 +9,50 @@ Item *listaItems;
 size_t listaItems_size = 0;
 int listaItems_length = 0;
 size_t listaUsers_size = 0;
+int activeUsers = 0;
 
 const int MAXUSERS = 20, MAXPROMOTERS = 10, MAXITEMS = 30;
 
+void saveItems(){
+    FILE *file = fopen("items.txt", "w");
+    if(file == NULL){
+        printf("Erro a abrir ficheiro para guardar items\n");
+        return;
+    }
+
+    for(int i = 0; i < listaItems_length; i++){
+        fprintf(file, "%d", (listaItems + i)->id);
+
+        fputc(' ', file);
+        fputs((listaItems + i)->nome, file);
+
+        fputc(' ', file);
+        fputs((listaItems + i)->cat, file);
+
+        fputc(' ', file);
+        fprintf(file, "%d", (listaItems + i)->valorA);
+
+        fputc(' ', file);
+        fprintf(file, "%d", (listaItems + i)->valorC);
+
+        fputc(' ', file);
+        fprintf(file, "%d", (listaItems + i)->duracao);
+
+        fputc(' ', file);
+        fputs((listaItems + i)->nomeV, file);
+
+        fputc(' ', file);
+        fputs((listaItems + i)->nomeL, file);
+        fputc('\n', file);
+    }
+
+    fclose(file);
+}
+
 void shutdown(){
     fprintf(stderr, "\nA desligar...\n");
+    saveUsersFile(fUsers);
+    saveItems();
     close(serv_fd);
     close(serv_to_cli_fd);
     close(cli_to_serv_fd);
@@ -37,7 +76,7 @@ bool checkPointerNull(char *ptr){
 }
 
 void executaComandos(){
-    	char input[100];
+    char input[100];
 	bool end = false;
 	int initSize = strlen(input);
         char delim[] = " ";
@@ -104,11 +143,6 @@ void executaPromotor(){
         }
 }
 
-void printItem(Item a){
-	printf("%d, %s, %s, %d, %d, %d, %s, %s\n\n", a.id, a.nome, a.cat, a.valorA, a.valorC, a.duracao, a.nomeV, a.nomeL);
-	return;
-}
-
 void printUserSaldo(Utilizador a){
 	printf("Saldo do utilizador [%s] é %d\n\n", a.nome, a.saldo);
 	return;
@@ -123,25 +157,53 @@ void *ClientHandlerThread(void *arg){
 
     int valid = isUserValid(msg.user.nome, msg.user.pwd);
     if(valid == -1){
-        fprintf(stderr, "Erro a verificiar a validade do utilizador, a fechar thread de utilizador pid: %d, nome do fifo: %s, nome do user %s\n", pidCliente, nameClientFifo, msg.user.nome);
+
+        fprintf(stderr, "Erro a verificar a validade do utilizador, a fechar thread de utilizador pid: %d, nome do fifo: %s, nome do user %s\n", pidCliente, nameClientFifo, msg.user.nome);
+        Resposta rsp;
+        rsp.wasExecuted = false;
+        if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+            fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+            shutdown();
+        }
         //TODO: Matar cliente com sinal
         return NULL;
+
     }else if(valid == 0){
+
         fprintf(stderr, "O utilizador pid: %d, nome do fifo: %s, nome do user %s, não possui credenciais válidas, a fechar thread e utilizador\n", pidCliente, nameClientFifo, msg.user.nome);
-        //TODO: Matar cliente com sinal
+        Resposta rsp;
+        rsp.wasExecuted = false;
+        strcpy(rsp.resp, "As credenciais indicadas são inválidas, por favor tente novamente");
+        if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+            fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+            shutdown();
+        }
+        //TODO: Em principio não é necessário enviar, o cliente vai se desligar a si mesmo (Matar cliente com sinal)
         return NULL;
+
+    }else{
+        Resposta rsp;
+        rsp.wasExecuted = true;
+        sprintf(rsp.resp, "%d", getUserBalance(msg.user.nome));
+        if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+            fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+            shutdown();
+        }
+        //TODO: maybe need to save which users are online
+        activeUsers++;
     }
 
     char delim[] = " ";
     while(1){
-        //TODO: ficar á espera de mensagens do utilizador e corresponder com a informação necessária
+
         if(read(cli_to_serv_fd, &msg, sizeof(msg)) == -1){
             fprintf(stderr, "Erro a ler mensagem do cliente\nA delisgar...\n");
             shutdown();
         }
 
         char *ptr = strtok(msg.cmd, delim);
-        if(strcpy(ptr, "sell") == 0){
+        if(strcmp(ptr, "sell") == 0){
+
             Resposta rsp;
             Item tmp;
             tmp.id = ++highestItemId;
@@ -164,11 +226,14 @@ void *ClientHandlerThread(void *arg){
 
             rsp.wasExecuted = true;
             sprintf(rsp.resp, "%d", tmp.id);
+
             if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
                 fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
                 shutdown();
             }
-        }else if(strcpy(ptr, "list") == 0){
+
+        }else if(strcmp(ptr, "list") == 0){
+
             Resposta rsp;
             rsp.wasExecuted = true;
             rsp.listaItems = (Item*) malloc(listaItems_size);
@@ -177,7 +242,9 @@ void *ClientHandlerThread(void *arg){
                 fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
                 shutdown();
             }
-        }else if(strcpy(ptr, "licat") == 0){
+
+        }else if(strcmp(ptr, "licat") == 0){
+
             Resposta rsp;
             char categoria[20];
             ptr = strtok(NULL, delim);
@@ -204,49 +271,140 @@ void *ClientHandlerThread(void *arg){
                 fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
                 shutdown();
             }
-        }else if(strcpy(ptr, "lisel") == 0){
+
+        }else if(strcmp(ptr, "lisel") == 0){
+
             Resposta rsp;
-            Item *tmp;
-            int counter = 0;
             ptr = strtok(NULL, delim);
             char nomeV[20];
             strcpy(nomeV, ptr);
-            //TODO:procurar pelo vendedor, adicionar á rsp e mandar
             for(int i = 0; i < listaItems_length; i++){
                 if(strcmp((listaItems + i)->nomeV, nomeV) == 0){
-                    if(tmp == NULL){
-                        tmp = (Item*) malloc(sizeof(Item));
+                    if(rsp.listaItems == NULL){
+                        rsp.listaItems = (Item*) malloc(sizeof(Item));
                     }else{
-                        tmp = (Item*) realloc(tmp, counter * sizeof(Item));
+                        rsp.listaItems= (Item*) realloc(rsp.listaItems, rsp.listaItems_length * sizeof(Item));
                     }
-
+                    *(rsp.listaItems + rsp.listaItems_length) = *(listaItems + i);
+                    rsp.listaItems_length++;
                 }
             }
-
-        }else if(strcpy(ptr, "lival") == 0){
-            Resposta rsp;
-            //TODO:procurar pelo preco, adicionar á rsp e mandar
-
-
-        }else if(strcpy(ptr, "litime") == 0){
-            Resposta rsp;
-            //TODO:procurar pelo tempo, adicionar á rsp e mandar
-
-
-        }else if(strcpy(ptr, "cash") == 0){
-            Resposta rsp;
-            int saldo = getUserBalance(msg.user.nome);
-            if(saldo == -1){
+            if(rsp.listaItems == NULL){
                 rsp.wasExecuted = false;
             }else{
                 rsp.wasExecuted = true;
-                sprintf(rsp.resp, "%d", saldo);
             }
             if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
                 fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
                 shutdown();
             }
-        }else if(strcpy(ptr, "add") == 0){
+
+        }else if(strcmp(ptr, "lival") == 0){
+
+            Resposta rsp;
+            ptr = strtok(NULL, delim);
+            int maxVal = atoi(ptr);
+            for(int i = 0; i < listaItems_length; i++){
+                if((listaItems + i)->valorA < maxVal){
+                    if(rsp.listaItems == NULL){
+                        rsp.listaItems = (Item*) malloc(sizeof(Item));
+                    }else{
+                        rsp.listaItems= (Item*) realloc(rsp.listaItems, rsp.listaItems_length * sizeof(Item));
+                    }
+                    *(rsp.listaItems + rsp.listaItems_length) = *(listaItems + i);
+                    rsp.listaItems_length++;
+                }
+            }
+            if(rsp.listaItems == NULL){
+                rsp.wasExecuted = false;
+            }else{
+                rsp.wasExecuted = true;
+            }
+            if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+                fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+                shutdown();
+            }
+
+        }else if(strcmp(ptr, "litime") == 0){
+
+            Resposta rsp;
+            ptr = strtok(NULL, delim);
+            int maxTime = atoi(ptr);
+            for(int i = 0; i < listaItems_length; i++){
+                if((listaItems + i)->valorA < maxTime){
+                    if(rsp.listaItems == NULL){
+                        rsp.listaItems = (Item*) malloc(sizeof(Item));
+                    }else{
+                        rsp.listaItems= (Item*) realloc(rsp.listaItems, rsp.listaItems_length * sizeof(Item));
+                    }
+                    *(rsp.listaItems + rsp.listaItems_length) = *(listaItems + i);
+                    rsp.listaItems_length++;
+                }
+            }
+            if(rsp.listaItems == NULL){
+                rsp.wasExecuted = false;
+            }else{
+                rsp.wasExecuted = true;
+            }
+
+            if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+                fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+                shutdown();
+            }
+
+        }else if(strcmp(ptr, "buy") == 0){
+
+            Resposta rsp;
+            ptr = strtok(NULL, delim);
+            int id = atoi(ptr);
+            ptr = strtok(NULL, delim);
+            int valorLic = atoi(ptr);
+
+            bool wasFound = false;
+            bool wasValid = true;
+
+            for(int i = 0; i < listaItems_length; i++){
+                if((listaItems + i)->id == id){
+                    wasFound = true;
+                    if((listaItems + i)->valorA >= valorLic){
+                        wasValid = false;
+                        break;
+                    }
+                    (listaItems + i)->valorA = valorLic;
+                    strcpy((listaItems + i)->nomeL, msg.user.nome);
+                }
+            }
+
+            if(!wasFound){
+                rsp.wasExecuted = false;
+                strcpy(rsp.resp, "Não foi encontrado um item com o id indicado\n");
+            }else if(!wasValid){
+                rsp.wasExecuted = false;
+                strcpy(rsp.resp, "O valor licitado não é válido\n");
+            }else{
+                rsp.wasExecuted = true;
+                strcpy(rsp.resp, "A licitacao no item foi realizada com sucesso\n");
+            }
+
+            if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+                fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+                shutdown();
+            }
+
+        }else if(strcmp(ptr, "cash") == 0){
+                Resposta rsp;
+                int saldo = getUserBalance(msg.user.nome);
+                if(saldo == -1){
+                    rsp.wasExecuted = false;
+                }else{
+                    rsp.wasExecuted = true;
+                    sprintf(rsp.resp, "%d", saldo);
+                }
+                if(write(serv_to_cli_fd, &rsp, sizeof(rsp)) == -1){
+                    fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
+                    shutdown();
+                }
+        }else if(strcmp(ptr, "add") == 0){
             Resposta rsp;
             ptr = strtok(NULL, delim);
             int qnt = atoi(ptr);
@@ -260,6 +418,9 @@ void *ClientHandlerThread(void *arg){
                 fprintf(stderr, "Erro a enviar mensagem ao cliente\nA delisgar...\n");
                 shutdown();
             }
+        }else if(strcpy(ptr, "exit") == 0){
+            activeUsers--;
+            return NULL;
         }
     }
 }

@@ -6,6 +6,10 @@ int pid;
 
 char nameClientFifo[50];
 
+Utilizador user;
+Mensagem msg;
+Resposta rsp;
+
 void shutdown(){
     close(servFd);
     close(cliToServFd);
@@ -27,12 +31,15 @@ void menuComandos(){
 
     char input[100];
 
-    int initSize = strlen(input);
     char delim[] = " ";
+
     while(!end){
+
         fgets(input, 100, stdin);
         char *ptr = strtok(input, delim);
+
         if(strcmp(ptr, "sell")==0){
+
             ptr = strtok(NULL, delim);
             if(checkPointerNull(ptr)){
                 continue;
@@ -88,7 +95,24 @@ void menuComandos(){
                 continue;
             }
             printf("Comando \"sell\" recebido\n", &nomeI, &nomeCat, precoB, precoC, duracao);
+
+            strcpy(msg.cmd, input);
+            if(write(cliToServFd, &msg, sizeof(msg)) == -1){
+                printf("Erro a escrever para o servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(read(servToCliFd, &rsp, sizeof(rsp)) == -1){
+                printf("Erro a ler do servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(!rsp.wasExecuted){
+                printf("O item não foi posto em leilão, por favor tente novamente\n");
+            }
+
         }else if(strcmp(ptr, "list\n")==0){
+
             printf("Dentro list\n");
             ptr = strtok(NULL, delim);
             if(ptr != NULL){
@@ -96,7 +120,25 @@ void menuComandos(){
                 continue;
             }
             printf("Comando \"list\" recebido\n");
+
+            input[strcspn(input, "\n")] = 0;
+            strcpy(msg.cmd, input);
+            if(write(cliToServFd, &msg, sizeof(msg)) == -1){
+                printf("Erro a escrever para o servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(read(servToCliFd, &rsp, sizeof(rsp)) == -1){
+                printf("Erro a ler do servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            for(int i = 0; i < rsp.listaItems_length; i++){
+                printItem(*(rsp.listaItems + i));
+            }
+
         }else if(strcmp(ptr, "licat")==0){
+
             ptr = strtok(NULL, delim);
             if(checkPointerNull(ptr)){
                 continue;
@@ -110,7 +152,24 @@ void menuComandos(){
                 continue;
             }
             printf("Comando \"licat\" recebido\n");
+
+            strcpy(msg.cmd, input);
+            if(write(cliToServFd, &msg, sizeof(msg)) == -1){
+                printf("Erro a escrever para o servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(read(servToCliFd, &rsp, sizeof(rsp)) == -1){
+                printf("Erro a ler do servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            for(int i = 0; i < rsp.listaItems_length; i++){
+                printItem(*(rsp.listaItems + i));
+            }
+
         }else if(strcmp(ptr, "lisel")==0){
+
             ptr = strtok(NULL, delim);
             if(checkPointerNull(ptr)){
                 continue;
@@ -124,7 +183,24 @@ void menuComandos(){
                 continue;
             }
             printf("Comando \"lisel\" recebido\n");
+
+            strcpy(msg.cmd, input);
+            if(write(cliToServFd, &msg, sizeof(msg)) == -1){
+                printf("Erro a escrever para o servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(read(servToCliFd, &rsp, sizeof(rsp)) == -1){
+                printf("Erro a ler do servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            for(int i = 0; i < rsp.listaItems_length; i++){
+                printItem(*(rsp.listaItems + i));
+            }
+
         }else if(strcmp(ptr, "lival")==0){
+
             ptr = strtok(NULL, delim);
             if(checkPointerNull(ptr)){
                 continue;
@@ -140,7 +216,24 @@ void menuComandos(){
                 printf("Argumentos a mais no comando \"lival\"\n");
             }
             printf("Comando \"lival\" recebido\n");
+
+            strcpy(msg.cmd, input);
+            if(write(cliToServFd, &msg, sizeof(msg)) == -1){
+                printf("Erro a escrever para o servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(read(servToCliFd, &rsp, sizeof(rsp)) == -1){
+                printf("Erro a ler do servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            for(int i = 0; i < rsp.listaItems_length; i++){
+                printItem(*(rsp.listaItems + i));
+            }
+
         }else if(strcmp(ptr, "litime")==0){
+
             ptr = strtok(NULL, delim);
             if(checkPointerNull(ptr)){
                 continue;
@@ -156,12 +249,37 @@ void menuComandos(){
                 printf("Argumentos a mais no comando \"litime\"\n");
             }
             printf("Comando \"litime\" recebido\n");
+
+            strcpy(msg.cmd, input);
+            if(write(cliToServFd, &msg, sizeof(msg)) == -1){
+                printf("Erro a escrever para o servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(read(servToCliFd, &rsp, sizeof(rsp)) == -1){
+                printf("Erro a ler do servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            for(int i = 0; i < rsp.listaItems_length; i++){
+                printItem(*(rsp.listaItems + i));
+            }
+
         }else if(strcmp(ptr, "time\n")==0){
+
             if(ptr != NULL){
                 printf("Argumentos a mais no comando \"time\"\n");
             }
             printf("Comando \"time\" recebido\n");
+
+            time_t current_time = time(NULL);
+
+            struct tm * tm = localtime(&current_time);
+            int hourInSeconds = tm->tm_hour * 3600;
+            printf("A hora (em segundos) é %d", hourInSeconds);
+
         }else if(strcmp(ptr, "buy")==0){
+
             ptr = strtok(NULL, delim);
             if(checkPointerNull(ptr)){
                 continue;
@@ -188,11 +306,46 @@ void menuComandos(){
             }
             printf("Comando \"buy\" recebido\n");
 
+            strcpy(msg.cmd, input);
+            if(write(cliToServFd, &msg, sizeof(msg)) == -1){
+                printf("Erro a escrever para o servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(read(servToCliFd, &rsp, sizeof(rsp)) == -1){
+                printf("Erro a ler do servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            printf("%s", rsp.resp);
+
         }else if(strcmp(ptr, "cash\n")==0){
+
             if(!checkPointerNull(ptr)){
                 printf("Arguementos a mais no comando \"cash\"\n");
             }
             printf("Comando \"cash\" recebido\n");
+
+            input[strcspn(input, "\n")] = 0;
+            strcpy(msg.cmd, input);
+            if(write(cliToServFd, &msg, sizeof(msg)) == -1){
+                printf("Erro a escrever para o servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(read(servToCliFd, &rsp, sizeof(rsp)) == -1){
+                printf("Erro a ler do servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(rsp.wasExecuted){
+                user.saldo = atoi(rsp.resp);
+                printf("Saldo atualizado\n");
+            }else{
+                //TODO: think about it
+                printf("Erro a pedir saldo ao servidor, tente novamente\n");
+            }
+
         }else if(strcmp(ptr, "add")==0){
             ptr = strtok(NULL, delim);
             if(checkPointerNull(ptr)){
@@ -209,12 +362,41 @@ void menuComandos(){
                 printf("Argumentos a mais no comando \"add\"\n");
             }
             printf("Comando \"add\" recebido\n");
-        }else if(strcmp(ptr, "exit")==0){
+
+            strcpy(msg.cmd, input);
+            if(write(cliToServFd, &msg, sizeof(msg)) == -1){
+                printf("Erro a escrever para o servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(read(servToCliFd, &rsp, sizeof(rsp)) == -1){
+                printf("Erro a ler do servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
+            if(rsp.wasExecuted){
+                user.saldo = atoi(rsp.resp);
+                printf("Saldo atualizado\n");
+            }else{
+                //TODO: think about it
+                printf("Erro a acrescentar saldo, tente novamente\n");
+            }
+
+        }else if(strcmp(ptr, "exit\n")==0){
+
             if(!checkPointerNull(ptr)){
                 printf("Argumentos a mais no comando \"exit\n");
             }
             printf("Comando \"exit\" recebido\n");
+
+            input[strcspn(input, "\n")] = 0;
+            if(write(cliToServFd, &msg, sizeof(msg)) == -1){
+                printf("Erro a escrever para o servidor\n A desligar cliente...\n");
+                shutdown();
+            }
+
             end = true;
+
         }else{
             printf("Comando inválido\n");
         }
@@ -246,11 +428,9 @@ int main(int argc, char ** argv){
         exit(EXIT_FAILURE);
     }
 
-	Utilizador user;
 	strcpy(user.nome, argv[1]);
 	strcpy(user.pwd, argv[2]);
 
-    Mensagem msg;
     msg.user = user;
     msg.pid = pid;
     strcpy(msg.fifoName, nameClientFifo);
@@ -262,7 +442,27 @@ int main(int argc, char ** argv){
         shutdown();
     }
 
-    if(write(c))
+    if(write(cliToServFd, &msg, sizeof(msg) ) == -1){
+        fprintf(stderr, "Erro a enviar mensagem ao servidor\nA delisgar...\n");
+        shutdown();
+    }
+
+    if(read(servToCliFd, &rsp, sizeof(rsp) ) == -1){
+        fprintf(stderr, "Erro a ler mensagem do servidor\nA delisgar...\n");
+        shutdown();
+    }
+
+    if(rsp.wasExecuted){
+        user.saldo = atoi(rsp.resp);
+        system("clear");
+        printf("\n******************************\n");
+        printf("*****Bem-vindo ao Frontend*****\n");
+        printf("******************************\n");
+    }else{
+        system("clear");
+        printf("%s", rsp.resp);
+        shutdown();
+    }
 
     menuComandos();
 
